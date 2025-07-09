@@ -5,9 +5,18 @@ from eval import (
     load_json_file, group_annotations, build_category_map,
     compute_stats, summarize, BASE_DIR, GT_FOLDER, PRED_FOLDER
 )
+from fastapi.middleware.cors import CORSMiddleware
+
 
 app = FastAPI()
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # 또는 ["http://localhost:5173"]
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 def build_file_path(folder: str, filename: str) -> str:
     """폴더와 파일명을 받아 파일 경로 반환"""
