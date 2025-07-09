@@ -1,13 +1,49 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import axios from "axios";
 import Header from "./components/Header";
 import FileSelector from "./components/FileSelector";
+import AnalyzeButton from "./components/AnalyzeButton";
 
 function App() {
-  const [gtFiles] = useState(["PC.json"]);
-  const [aiFiles] = useState(["250311_pc_output.json"]);
-
+  const [gtFiles, setGtFiles] = useState([]);
+  const [aiFiles, setAiFiles] = useState([]);
   const [selectedGT, setSelectedGT] = useState("");
   const [selectedAI, setSelectedAI] = useState("");
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    axios
+      .get("http://localhost:8000/list-files/")
+      .then((res) => {
+        setGtFiles(res.data.gt_files);
+        setAiFiles(res.data.ai_files);
+      })
+      .catch((err) => console.error(err));
+  }, []);
+
+  const handleAnalyze = async () => {
+    if (!selectedGT || !selectedAI) return;
+    setLoading(true);
+    setResult(null);
+    try {
+      const formData = new FormData();
+      formData.append("gt_filename", selectedGT);
+      formData.append("pred_filename", selectedAI);
+      formData.append("threshold", 0.7);
+
+      const res = await axios.post(
+        "http://localhost:8000/evaluate-by-name/",
+        formData
+      );
+      setResult(res.data);
+    } catch (error) {
+      console.error(error);
+      alert("분석 중 오류가 발생했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -30,6 +66,18 @@ function App() {
           selectedFile={selectedAI}
           onChange={setSelectedAI}
         />
+
+        <AnalyzeButton
+          onClick={handleAnalyze}
+          disabled={!selectedGT || !selectedAI || loading}
+        />
+
+        {loading && <p className="mt-4 text-blue-500">분석 중...</p>}
+        {result && (
+          <pre className="mt-4 p-4 bg-white border rounded overflow-x-auto text-sm">
+            {JSON.stringify(result, null, 2)}
+          </pre>
+        )}
       </main>
     </div>
   );
