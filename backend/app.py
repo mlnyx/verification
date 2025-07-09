@@ -1,6 +1,4 @@
-import uvicorn
-from fastapi import FastAPI, UploadFile, Form
-import shutil
+from fastapi import FastAPI, Form
 import os
 from eval import (
     load_json_file, group_annotations, build_category_map,
@@ -9,17 +7,12 @@ from eval import (
 
 app = FastAPI()
 
+def get_file_path(folder: str, filename: str) -> str:
+    """지정된 폴더에서 파일 경로 생성"""
+    return os.path.join(BASE_DIR, folder, filename)
 
-def save_upload_file(upload_file: UploadFile, folder: str) -> str:
-    """업로드된 파일을 지정 폴더에 저장"""
-    file_path = os.path.join(BASE_DIR, folder, upload_file.filename)
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(upload_file.file, buffer)
-    return file_path
-
-
-def prepare_data(gt_path: str, pred_path: str):
-    """GT와 Prediction JSON 데이터를 로드하고 파싱"""
+def prepare_annotations(gt_path: str, pred_path: str):
+    """JSON 파일을 로드하고 annotation과 카테고리 맵 반환"""
     gt_data = load_json_file(gt_path)
     pred_data = load_json_file(pred_path)
     if not (gt_data and pred_data):
@@ -29,14 +22,12 @@ def prepare_data(gt_path: str, pred_path: str):
     cat_map = build_category_map(gt_data.get('categories', []))
     return gt_anns, pred_anns, cat_map, None
 
+@app.post("/evaluate-by-name/")
+async def evaluate_by_name(gt_filename: str = Form(...), pred_filename: str = Form(...), threshold: float = Form(...)):
+    gt_path = get_file_path(GT_FOLDER, gt_filename)
+    pred_path = get_file_path(PRED_FOLDER, pred_filename)
 
-@app.post("/evaluate/")
-async def evaluate_endpoint(gt_file: UploadFile, pred_file: UploadFile, threshold: float = Form(...)):
-    """평가 API 엔드포인트"""
-    gt_path = save_upload_file(gt_file, GT_FOLDER)
-    pred_path = save_upload_file(pred_file, PRED_FOLDER)
-
-    gt_anns, pred_anns, cat_map, error = prepare_data(gt_path, pred_path)
+    gt_anns, pred_anns, cat_map, error = prepare_annotations(gt_path, pred_path)
     if error:
         return {"error": error}
 
@@ -45,6 +36,6 @@ async def evaluate_endpoint(gt_file: UploadFile, pred_file: UploadFile, threshol
 
     return {"iou_threshold": threshold, "results": results}
 
-
 if __name__ == "__main__":
+    import uvicorn
     uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
