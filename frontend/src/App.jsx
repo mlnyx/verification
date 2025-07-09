@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
 import Header from "./components/Header";
 import FileSelector from "./components/FileSelector";
 import AnalyzeButton from "./components/AnalyzeButton";
-import ResultTable from "./components/ResultTable";
+import ResultGrid from "./components/ResultGrid";
+import { fetchFileList, evaluateFiles } from "../api/evaluation";
+import { DEFAULT_THRESHOLD } from "../constants";
 
 function App() {
   const [gtFiles, setGtFiles] = useState([]);
@@ -14,32 +15,27 @@ function App() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    axios
-      .get("http://localhost:8000/list-files/")
+    fetchFileList()
       .then((res) => {
         setGtFiles(res.data.gt_files);
         setAiFiles(res.data.ai_files);
       })
-      .catch((err) => console.error(err));
+      .catch(console.error);
   }, []);
 
   const handleAnalyze = async () => {
     if (!selectedGT || !selectedAI) return;
     setLoading(true);
     setResult(null);
-    try {
-      const formData = new FormData();
-      formData.append("gt_filename", selectedGT);
-      formData.append("pred_filename", selectedAI);
-      formData.append("threshold", 0.7);
 
-      const res = await axios.post(
-        "http://localhost:8000/evaluate-by-name/",
-        formData
+    try {
+      const res = await evaluateFiles(
+        selectedGT,
+        selectedAI,
+        DEFAULT_THRESHOLD
       );
-      setResult(res.data.results); // 여기서 results만 넘김
+      setResult(res.data.results);
     } catch (error) {
-      console.error(error);
       alert("분석 중 오류가 발생했습니다.");
     } finally {
       setLoading(false);
@@ -49,7 +45,7 @@ function App() {
   return (
     <div className="min-h-screen bg-gray-100">
       <Header />
-      <main className="p-8 max-w-xl mx-auto">
+      <main className="p-8 max-w-6xl mx-auto">
         <h2 className="text-2xl font-semibold mb-4">AI 검증 프로그램</h2>
         <p className="text-gray-700 mb-6">
           GT, AI 파일을 선택 후 분석을 진행하세요.
@@ -74,8 +70,7 @@ function App() {
         />
 
         {loading && <p className="mt-4 text-blue-500">분석 중...</p>}
-
-        {result && <ResultTable results={result} />}
+        {result && <ResultGrid results={result} />}
       </main>
     </div>
   );
