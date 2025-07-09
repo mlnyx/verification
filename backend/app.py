@@ -43,6 +43,15 @@ async def evaluate(gt_filename: str = Form(...), pred_filename: str = Form(...),
 
     return {"iou_threshold": threshold, "results": results}
 
+@app.get("/list-files/")
+async def list_files():
+    gt_path = os.path.join(BASE_DIR, GT_FOLDER)
+    ai_path = os.path.join(BASE_DIR, PRED_FOLDER)
+
+    gt_files = [f for f in os.listdir(gt_path) if f.endswith(".json")]
+    ai_files = [f for f in os.listdir(ai_path) if f.endswith(".json")]
+
+    return {"gt_files": gt_files, "ai_files": ai_files}
 
 if __name__ == "__main__":
     uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
