@@ -3,6 +3,7 @@ import axios from "axios";
 import Header from "./components/Header";
 import FileSelector from "./components/FileSelector";
 import AnalyzeButton from "./components/AnalyzeButton";
+import ResultTable from "./components/ResultTable";
 
 function App() {
   const [gtFiles, setGtFiles] = useState([]);
@@ -36,7 +37,7 @@ function App() {
         "http://localhost:8000/evaluate-by-name/",
         formData
       );
-      setResult(res.data);
+      setResult(res.data.results); // 여기서 results만 넘김
     } catch (error) {
       console.error(error);
       alert("분석 중 오류가 발생했습니다.");
@@ -73,11 +74,8 @@ function App() {
         />
 
         {loading && <p className="mt-4 text-blue-500">분석 중...</p>}
-        {result && (
-          <pre className="mt-4 p-4 bg-white border rounded overflow-x-auto text-sm">
-            {JSON.stringify(result, null, 2)}
-          </pre>
-        )}
+
+        {result && <ResultTable results={result} />}
       </main>
     </div>
   );
