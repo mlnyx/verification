@@ -6,7 +6,8 @@ def save_results_to_excel(summary, file_path="result.xlsx"):
             "라벨 이름": label,
             "전체 탐지 개수": data["total_gt"],
             "일치 개수": data["detected"],
-            "정확도(%)": data["accuracy"]
+            "정확도(%)": data["accuracy"],
+            "IoU threshold": data["threshold"]
         }
         for label, data in summary.items()
     ])
