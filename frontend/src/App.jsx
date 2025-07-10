@@ -32,7 +32,8 @@ function App() {
       );
       setResult(res.results);
     } catch (error) {
-      alert("분석 중 오류가 발생했습니다.");
+      console.error(error);
+      alert("분석 중 오류가 발생했습니다. 콘솔 로그를 확인하세요.");
     } finally {
       setLoading(false);
     }
@@ -87,7 +88,26 @@ function App() {
       {result && (
         <div>
           <h3>결과</h3>
-          <pre>{JSON.stringify(result, null, 2)}</pre>
+          <table>
+            <thead>
+              <tr>
+                <th>카테고리</th>
+                <th>Total GT</th>
+                <th>Detected</th>
+                <th>Accuracy (%)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Object.entries(result).map(([category, metrics]) => (
+                <tr key={category}>
+                  <td>{category}</td>
+                  <td>{metrics.total_gt}</td>
+                  <td>{metrics.detected}</td>
+                  <td>{metrics.accuracy}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
