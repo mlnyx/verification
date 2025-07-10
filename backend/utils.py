@@ -1,64 +1,101 @@
 import os
-from eval import CARIES_GROUP_IDS
 
-def select_json_file(folder, desc="파일"):
+def list_json(folder, desc="파일"):
     files = [f for f in os.listdir(folder) if f.endswith('.json')]
-    print(f"\n {desc} 목록")
-    for idx, f in enumerate(files, 1):
-        print(f"[{idx}] {f}")
-    choice = int(input(f"{desc} 번호를 선택하세요: ")) - 1
-    return files[choice]
+    print(f"\n📄 {desc}")
+    for i, f in enumerate(files, 1):
+        print(f"[{i}] {f}")
+    idx = int(input(f"{desc} 번호 선택: ")) - 1
+    return files[idx]
 
-def create_category_map(categories):
-    cat_map = {}
+def get_categories(json_obj):
+    cat_list = json_obj.get("categories", [])
+    for cat in cat_list:
+        print(f"{cat['name']} (id: {cat['id']})")
+    return {cat['id']: cat['name'] for cat in cat_list}
+
+def auto_generate_mapping(gt_cats, ai_cats):
+    """이름 기반 자동 매핑"""
+    mapping = {}
+    gt_names = {v.lower().replace(" ", ""): k for k, v in gt_cats.items()}
+    for ai_id, ai_name in ai_cats.items():
+        simplified_ai = ai_name.lower().replace(" ", "")
+        matched_gt_id = None
+        for gt_simple_name, gt_id in gt_names.items():
+            if simplified_ai in gt_simple_name or gt_simple_name in simplified_ai:
+                matched_gt_id = gt_id
+                break
+        if matched_gt_id:
+            mapping[ai_id] = matched_gt_id
+    return mapping
+
+def print_auto_mapping(mapping, gt_cats, ai_cats):
+    print("\n🔎 자동 생성된 매핑")
+    for ai_id, gt_id in mapping.items():
+        print(f"AI {ai_cats[ai_id]} (id: {ai_id}) ➜ GT {gt_cats[gt_id]} (id: {gt_id})")
+
+def input_manual_mapping(gt_cats, ai_cats):
+    print("\n💬 매핑 예: 11:21,12:22")
+    mapping_str = input("GT id → AI id 매핑을 입력하세요: ")
+    mapping = {}
+    for pair in mapping_str.split(","):
+        if ":" in pair:
+            gt_id, ai_id = map(int, pair.split(":"))
+            mapping[ai_id] = gt_id
+    return mapping
+
+def apply_category_mapping(ai_json, id_mapping):
+    for ann in ai_json.get("annotations", []):
+        old_id = ann["category_id"]
+        if old_id in id_mapping:
+            ann["category_id"] = id_mapping[old_id]
+    return ai_json
+
+def show_categories(cat_map, caries_ids):
+    print("\n[라벨 목록 및 ID]")
     printed = set()
-
-    print("\n[라벨 목록 및 ID]\n----------------------------")
-    for cat in categories:
-        cat_id = cat["id"]
-        if cat_id in CARIES_GROUP_IDS:
+    for cid, name in cat_map.items():
+        if name == "caries":
             if "caries" not in printed:
-                print(f"caries (group ids: {CARIES_GROUP_IDS})")
+                print(f"caries (group ids: {caries_ids})")
                 printed.add("caries")
-            cat_map[cat_id] = "caries"
         else:
-            print(f"{cat['name']} (id: {cat_id})")
-            cat_map[cat_id] = cat["name"]
-    return cat_map
+            print(f"{name} (id: {cid})")
 
-def get_default_threshold():
-    default_input = input("\n기본 IoU threshold 값을 입력하세요 (Enter = 0.5): ")
-    return float(default_input) if default_input.strip() else 0.5
+def get_threshold_input(prompt, default_val):
+    val = input(f"{prompt} (기본 {default_val}): ")
+    return float(val) if val.strip() else default_val
 
-def get_special_ids():
-    special_input = input("개별 IoU threshold를 설정할 라벨 id들을 쉼표로 입력하세요 (예: 11,17) (Enter = 없음): ")
-    return [int(x.strip()) for x in special_input.split(",") if x.strip()] if special_input.strip() else []
+def parse_special_ids():
+    ids_str = input("개별 설정할 id들 (쉼표, Enter=없음): ")
+    if not ids_str.strip():
+        return []
+    return [int(x.strip()) for x in ids_str.split(",") if x.strip()]
 
-def input_threshold_for_label(label_name, default_threshold):
-    inp = input(f"{label_name} → IoU threshold 입력 (기본 {default_threshold}): \n")
-    return float(inp) if inp.strip() else default_threshold
+def assign_threshold(thresholds, cid, value):
+    thresholds[cid] = value
 
-def get_iou_thresholds(cat_map):
-    default_threshold = get_default_threshold()
-    special_ids = get_special_ids()
+def set_thresholds(cat_map, caries_ids):
+    default_t = get_threshold_input("기본 IoU threshold", 0.5)
+    special_ids = parse_special_ids()
 
-    iou_thresholds = {}
-    entered_groups = set()
+    thresholds = {}
+    entered_caries = False
 
-    for cat_id, cat_name in cat_map.items():
-        if cat_name == "caries":
-            if "caries" in entered_groups:
-                iou_thresholds[cat_id] = iou_thresholds["caries_group"]
+    for cid, name in cat_map.items():
+        if name == "caries":
+            if entered_caries:
+                assign_threshold(thresholds, cid, thresholds["caries_group"])
                 continue
-            threshold = input_threshold_for_label("caries (group)", default_threshold)
-            iou_thresholds["caries_group"] = threshold
-            iou_thresholds[cat_id] = threshold
-            entered_groups.add("caries")
-        elif cat_id in special_ids:
-            threshold = input_threshold_for_label(f"{cat_name} (id: {cat_id})", default_threshold)
-            iou_thresholds[cat_id] = threshold
+            t = get_threshold_input("caries (group)", default_t)
+            thresholds["caries_group"] = t
+            assign_threshold(thresholds, cid, t)
+            entered_caries = True
+        elif cid in special_ids:
+            t = get_threshold_input(f"{name} (id: {cid})", default_t)
+            assign_threshold(thresholds, cid, t)
         else:
-            iou_thresholds[cat_id] = default_threshold
+            assign_threshold(thresholds, cid, default_t)
 
-    iou_thresholds.pop("caries_group", None)
-    return iou_thresholds, default_threshold
+    thresholds.pop("caries_group", None)
+    return thresholds

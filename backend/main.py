@@ -1,49 +1,61 @@
 import os
-from eval import load_json_file, group_annotations, compute_stats, summarize
+import json
+from eval import Evaluator
+from utils import list_json, get_categories, auto_generate_mapping, print_auto_mapping, input_manual_mapping, apply_category_mapping, show_categories, set_thresholds
 from result import save_results_to_excel
-from utils import select_json_file, create_category_map, get_iou_thresholds
 
-# 설정
 GT_FOLDER = "./backend/data/GT"
 AI_FOLDER = "./backend/data/AI"
 IMG_SIZE = (2000, 2000)
-EXCEL_SAVE_PATH = "result.xlsx"
+EXCEL_PATH = "result.xlsx"
 
-# GT & AI 파일 선택
-GT_FILENAME = select_json_file(GT_FOLDER, "GT 파일")
-AI_FILENAME = select_json_file(AI_FOLDER, "AI 파일")
+# 파일 선택
+gt_file = list_json(GT_FOLDER, "GT 파일")
+ai_file = list_json(AI_FOLDER, "AI 파일")
 
-gt_path = os.path.join(GT_FOLDER, GT_FILENAME)
-ai_path = os.path.join(AI_FOLDER, AI_FILENAME)
+gt_path = os.path.join(GT_FOLDER, gt_file)
+ai_path = os.path.join(AI_FOLDER, ai_file)
 
 # JSON 로드
-gt_json = load_json_file(gt_path)
-ai_json = load_json_file(ai_path)
+with open(gt_path, 'r', encoding='utf-8') as f:
+    gt_json = json.load(f)
+with open(ai_path, 'r', encoding='utf-8') as f:
+    ai_json = json.load(f)
 
-# 어노테이션 준비
-gt_anns = group_annotations(gt_json.get("annotations", []))
-ai_anns = group_annotations(ai_json.get("annotations", []))
-categories = gt_json.get("categories", [])
+# 카테고리 출력
+print("\n🔎 GT 라벨")
+gt_cats = get_categories(gt_json)
+print("\n🔎 AI 라벨")
+ai_cats = get_categories(ai_json)
 
-# 카테고리 map 생성
-cat_map = create_category_map(categories)
+# 자동 매핑
+auto_mapping = auto_generate_mapping(gt_cats, ai_cats)
+print_auto_mapping(auto_mapping, gt_cats, ai_cats)
 
-# threshold 입력
-iou_thresholds, default_threshold = get_iou_thresholds(cat_map)
+# 사용자 확인
+confirm = input("\n자동 매핑을 사용할까요? (Enter = 예, n = 직접 입력): ")
+if confirm.strip().lower() == "n":
+    manual_mapping = input_manual_mapping(gt_cats, ai_cats)
+    final_mapping = manual_mapping
+else:
+    final_mapping = auto_mapping
 
-# 평가 수행
-stats = compute_stats(gt_anns, ai_anns, iou_thresholds, IMG_SIZE)
-summary = summarize(stats, cat_map)
+# AI JSON에 매핑 적용
+ai_json = apply_category_mapping(ai_json, final_mapping)
 
-# summary에 threshold 추가
-for cat_name, data in summary.items():
-    for cat_id, name in cat_map.items():
-        if name == cat_name:
-            data["threshold"] = iou_thresholds.get(cat_id, default_threshold)
-            break
+# 임시 파일 저장
+temp_ai_path = "./backend/data/AI/_temp_mapped_ai.json"
+with open(temp_ai_path, 'w', encoding='utf-8') as f:
+    json.dump(ai_json, f, indent=2)
 
-# 정확도 기준 정렬
+# Evaluator
+tmp_eval = Evaluator(gt_path, temp_ai_path, {}, IMG_SIZE)
+show_categories(tmp_eval.cat_map, tmp_eval.caries_ids)
+thresh = set_thresholds(tmp_eval.cat_map, tmp_eval.caries_ids)
+
+eval_final = Evaluator(gt_path, temp_ai_path, thresh, IMG_SIZE)
+stats = eval_final.compute_stats()
+summary = eval_final.summarize(stats)
 sorted_summary = dict(sorted(summary.items(), key=lambda x: x[1]["accuracy"], reverse=True))
 
-# 엑셀 저장
-save_results_to_excel(sorted_summary, EXCEL_SAVE_PATH)
+save_results_to_excel(sorted_summary, EXCEL_PATH)
