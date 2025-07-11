@@ -23,9 +23,9 @@ with open(ai_path, 'r', encoding='utf-8') as f:
     ai_json = json.load(f)
 
 # 카테고리 출력
-print("\n🔎 GT 라벨")
+print("\nGT 라벨")
 gt_cats = get_categories(gt_json)
-print("\n🔎 AI 라벨")
+print("\nAI 라벨")
 ai_cats = get_categories(ai_json)
 
 # 자동 매핑

@@ -2,7 +2,7 @@ import os
 
 def list_json(folder, desc="파일"):
     files = [f for f in os.listdir(folder) if f.endswith('.json')]
-    print(f"\n📄 {desc}")
+    print(f"\n//{desc}//")
     for i, f in enumerate(files, 1):
         print(f"[{i}] {f}")
     idx = int(input(f"{desc} 번호 선택: ")) - 1
@@ -30,12 +30,12 @@ def auto_generate_mapping(gt_cats, ai_cats):
     return mapping
 
 def print_auto_mapping(mapping, gt_cats, ai_cats):
-    print("\n🔎 자동 생성된 매핑")
+    print("\n 자동 생성된 매핑")
     for ai_id, gt_id in mapping.items():
         print(f"AI {ai_cats[ai_id]} (id: {ai_id}) ➜ GT {gt_cats[gt_id]} (id: {gt_id})")
 
 def input_manual_mapping(gt_cats, ai_cats):
-    print("\n💬 매핑 예: 11:21,12:22")
+    print("\n 매핑 예: 11:21,12:22")
     mapping_str = input("GT id → AI id 매핑을 입력하세요: ")
     mapping = {}
     for pair in mapping_str.split(","):

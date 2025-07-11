@@ -73,6 +73,7 @@ class Evaluator:
         self.matcher = AnnotationMatcher(caries_ids)
         self.main_caries_id = next(iter(caries_ids))
         self.cat_map = self._build_category_map(caries_ids)
+        self.caries_ids = caries_ids 
 
     def _load_json(self, path):
         """JSON 파일을 읽어서 딕셔너리 반환"""
